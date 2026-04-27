@@ -1,0 +1,12 @@
+/* Tailwind CSS v4 setup (Vite plugin handles the build) */
+@import "tailwindcss";
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+}
