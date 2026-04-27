@@ -90,6 +90,97 @@ async function main() {
     }
   });
 
+  // PUT /filters/:id -> update an existing filter
+  app.put("/filters/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) {
+        return res.status(400).json({ error: "id must be an integer" });
+      }
+
+      const {
+        reference,
+        name,
+        brand,
+        width,
+        height,
+        depth = null,
+        description
+      } = req.body ?? {};
+
+      if (!reference || !name || !brand || !description) {
+        return res.status(400).json({
+          error: "reference, name, brand, and description are required"
+        });
+      }
+
+      const widthNumber = Number(width);
+      const heightNumber = Number(height);
+      const depthNumber = depth === null || depth === "" ? null : Number(depth);
+
+      if (Number.isNaN(widthNumber) || Number.isNaN(heightNumber)) {
+        return res.status(400).json({ error: "width and height must be numbers" });
+      }
+      if (depthNumber !== null && Number.isNaN(depthNumber)) {
+        return res.status(400).json({ error: "depth must be a number (or empty)" });
+      }
+
+      const result = await run(
+        db,
+        `
+        UPDATE filters
+        SET reference = ?, name = ?, brand = ?, width = ?, height = ?, depth = ?, description = ?
+        WHERE id = ?
+        `.trim(),
+        [
+          String(reference).trim(),
+          String(name).trim(),
+          String(brand).trim(),
+          widthNumber,
+          heightNumber,
+          depthNumber,
+          String(description).trim(),
+          id
+        ]
+      );
+
+      if (result.changes === 0) {
+        return res.status(404).json({ error: "filter not found" });
+      }
+
+      const updated = await all(db, "SELECT * FROM filters WHERE id = ?", [id]);
+      return res.json(updated[0]);
+    } catch (err) {
+      if (err && err.code === "SQLITE_CONSTRAINT") {
+        return res
+          .status(409)
+          .json({ error: "reference must be unique (already exists)" });
+      }
+      console.error(err);
+      return res.status(500).json({ error: "internal server error" });
+    }
+  });
+
+  // DELETE /filters/:id -> delete a filter
+  app.delete("/filters/:id", async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id)) {
+        return res.status(400).json({ error: "id must be an integer" });
+      }
+
+      const result = await run(db, "DELETE FROM filters WHERE id = ?", [id]);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: "filter not found" });
+      }
+
+      return res.status(204).send();
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "internal server error" });
+    }
+  });
+
   // GET /filters -> get all filters
   app.get("/filters", async (req, res) => {
     try {
